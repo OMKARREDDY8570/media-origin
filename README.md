@@ -20,10 +20,10 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements-dev.txt
-Copy-Item .env.example .env
+Copy-Item .env.example .env.local
 ```
 
-Edit `.env` and set `TELEGRAM_BOT_TOKEN` to the token from BotFather. Do not share or commit `.env`.
+Edit `.env.local` and set `TELEGRAM_BOT_TOKEN` to the token from BotFather. The app also loads `.env` as a fallback. Do not share or commit either file.
 
 Install ExifTool separately from its official distribution if desired, ensure `exiftool` is on `PATH`, then verify with `exiftool -ver`. It is optional and never launched through a shell. The C2PA SDK includes a native component; verify its import and real file behavior using:
 
@@ -38,7 +38,7 @@ The unit and local end-to-end tests do not require a Telegram token or network a
 ## Bot setup and commands
 
 1. Open BotFather in Telegram, send `/newbot`, follow the naming prompts, and copy its token.
-2. Put the token in `.env` locally or in a protected environment variable on the host.
+2. Put the token in `.env.local` (or `.env`) locally or in a protected environment variable on the host.
 3. Run `python main.py`.
 4. Send `/start` and a photo or image document.
 
