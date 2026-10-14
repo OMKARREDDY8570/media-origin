@@ -67,13 +67,10 @@ def _extract_exif(exif: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         name = EXIF_NAMES.get(tag_id, f"Tag_{tag_id}")
         if name == "GPSInfo":
             try:
-                raw_gps = value
-                if hasattr(value, "items"):
-                    gps_tags = {
-                        GPS_NAMES.get(key, str(key)): item for key, item in value.items()
-                    }
-                else:
-                    gps_tags = {}
+                gps_ifd = exif.get_ifd(ExifTags.IFD.GPSInfo)
+                gps_tags = {
+                    GPS_NAMES.get(key, str(key)): item for key, item in gps_ifd.items()
+                }
                 latitude = _dms_to_degrees(
                     gps_tags.get("GPSLatitude"), gps_tags.get("GPSLatitudeRef")
                 )
@@ -82,9 +79,13 @@ def _extract_exif(exif: Any) -> tuple[dict[str, Any], dict[str, Any]]:
                 )
                 if latitude is not None and longitude is not None:
                     gps["coordinates"] = {"latitude": latitude, "longitude": longitude}
-                gps["fields"] = _safe_value(gps_tags)
-                if not gps_tags and raw_gps is not None:
-                    gps["fields"] = _safe_value(raw_gps)
+                altitude = gps_tags.get("GPSAltitude")
+                if altitude is not None:
+                    gps["altitude_meters"] = round(float(altitude), 2) * (
+                        -1 if int(gps_tags.get("GPSAltitudeRef", 0)) == 1 else 1
+                    )
+                if not gps_tags:
+                    gps["parse_error"] = "GPS metadata was present but could not be decoded."
             except (TypeError, ValueError):
                 gps["parse_error"] = "GPS metadata could not be decoded."
         else:
@@ -248,7 +249,12 @@ def analyze_metadata(path: Path) -> dict[str, Any]:
         result["software"].append(
             {"source": "EXIF Software", "value": result["exif"]["Software"], "kind": "declared"}
         )
-    if not result["exif"] and not result["xmp"] and not result["iptc"]:
+    if (
+        not result["exif"]
+        and not result["xmp"]
+        and not result["iptc"]
+        and result["gps"].get("status") != "PRESENT"
+    ):
         result["status"] = "NOT DETECTED"
     result["analyzed_at"] = datetime.now(timezone.utc).isoformat()
     return result

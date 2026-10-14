@@ -30,6 +30,50 @@ def _limited(value: Any, depth: int = 0) -> Any:
     return str(value)[:2_000]
 
 
+def _validation_buckets(value: Any) -> dict[str, list[Any]]:
+    results: dict[str, list[Any]] = {
+        "success": [],
+        "failure": [],
+        "informational": [],
+        "unclassified": [],
+    }
+    status_names = {
+        "success": "success",
+        "successful": "success",
+        "failure": "failure",
+        "failures": "failure",
+        "error": "failure",
+        "errors": "failure",
+        "informational": "informational",
+        "info": "informational",
+    }
+
+    def visit(item: Any, status: str | None = None) -> None:
+        if isinstance(item, dict):
+            if status is not None and "code" in item:
+                results[status].append(_limited(item))
+                return
+            for key, child in item.items():
+                child_status = status_names.get(str(key).lower(), status)
+                visit(child, child_status)
+        elif isinstance(item, list):
+            for child in item:
+                visit(child, status)
+        elif item is not None:
+            results[status or "unclassified"].append(_limited(item))
+
+    visit(value)
+    return results
+
+
+def _validation_codes(results: list[Any]) -> set[str]:
+    codes: set[str] = set()
+    for result in results:
+        if isinstance(result, dict) and isinstance(result.get("code"), str):
+            codes.add(result["code"])
+    return codes
+
+
 def analyze_c2pa(path: Path) -> dict[str, Any]:
     """Read and validate embedded credentials with the official SDK."""
     try:
@@ -96,16 +140,27 @@ def analyze_c2pa(path: Path) -> dict[str, Any]:
     validation_issues = store.get("validation_results", store.get("validation_issues"))
     if validation_issues is None:
         validation_issues = validation_status
+    validation = _validation_buckets(validation_issues)
     if not active_name:
-        if validation_issues:
+        if validation["failure"]:
             return {
                 "status": "INVALID",
                 "credential": "PRESENT",
                 "active_manifest": None,
                 "validation_status": _limited(validation_status),
-                "validation_issues": _limited(validation_issues),
+                "validation_issues": validation["failure"],
                 "remote_retrieval": "DISABLED",
                 "limitation": "SDK validation errors do not prove that the image itself is fake.",
+            }
+        if validation["unclassified"]:
+            return {
+                "status": "INCONCLUSIVE",
+                "credential": "NOT VERIFIED",
+                "active_manifest": None,
+                "validation_status": _limited(validation_status),
+                "validation_issues": [],
+                "unclassified_validation_results": validation["unclassified"],
+                "remote_retrieval": "DISABLED",
             }
         return {
             "status": "NOT DETECTED",
@@ -120,14 +175,29 @@ def analyze_c2pa(path: Path) -> dict[str, Any]:
     manifests = manifests if isinstance(manifests, dict) else {}
     active = manifests.get(active_name, {})
     active = active if isinstance(active, dict) else {}
-    if validation_issues:
+    if validation["failure"]:
         status = "INVALID"
     else:
-        status = "INCONCLUSIVE"
+        status = "PRESENT"
 
     signature = active.get("signature_info", active.get("signature", {}))
     signature = signature if isinstance(signature, dict) else {}
-    validation_issues = _limited(validation_issues or [])
+    successful_codes = _validation_codes(validation["success"])
+    failure_codes = _validation_codes(validation["failure"])
+    signature_integrity = (
+        "VERIFIED"
+        if "claimSignature.validated" in successful_codes
+        else "INVALID"
+        if "claimSignature.validated" in failure_codes
+        else "NOT VERIFIED"
+    )
+    certificate_trust = (
+        "VERIFIED"
+        if "signingCredential.trusted" in successful_codes
+        else "NOT TRUSTED (SDK reported a validation failure)"
+        if "signingCredential.trusted" in failure_codes
+        else "NOT VERIFIED"
+    )
     return {
         "status": status,
         "credential": "PRESENT",
@@ -137,14 +207,17 @@ def analyze_c2pa(path: Path) -> dict[str, Any]:
         "claim_generator_info": _limited(active.get("claim_generator_info", [])),
         "signature_issuer": signature.get("issuer"),
         "signature_timestamp": signature.get("time", signature.get("timestamp")),
-        "signature_integrity": "NOT VERIFIED (no explicit positive result exposed)",
-        "certificate_trust": "NOT VERIFIED (no trust anchors configured)",
+        "signature_integrity": signature_integrity,
+        "certificate_trust": certificate_trust,
         "signer_identity": "NOT VERIFIED",
         "signature": _limited(signature),
         "assertions": _limited(active.get("assertions", [])),
         "ingredients": _limited(active.get("ingredients", [])),
         "validation_status": _limited(validation_status),
-        "validation_issues": validation_issues,
+        "validation_issues": validation["failure"],
+        "validation_successes": validation["success"],
+        "validation_informational": validation["informational"],
+        "unclassified_validation_results": validation["unclassified"],
         "manifests": _limited(manifests),
         "remote_retrieval": "DISABLED",
         "limitation": (

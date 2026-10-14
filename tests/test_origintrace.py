@@ -56,6 +56,28 @@ def test_exif_timestamps_preserve_source_and_timezone_offset(tmp_path: Path) -> 
     assert capture["timezone_offset"] == "+05:30"
 
 
+def test_gps_ifd_pointer_is_decoded_as_coordinates(tmp_path: Path) -> None:
+    path = tmp_path / "gps.jpg"
+    exif = Image.Exif()
+    exif[34853] = {
+        1: "N",
+        2: (12.0, 34.0, 56.0),
+        3: "W",
+        4: (98.0, 45.0, 12.0),
+        5: 0,
+        6: 10.5,
+    }
+    Image.new("RGB", (16, 12)).save(path, format="JPEG", exif=exif)
+    result = analyze_metadata(path)
+    assert result["gps"]["status"] == "PRESENT"
+    assert result["gps"]["coordinates"] == {
+        "latitude": 12.5822222,
+        "longitude": -98.7533333,
+    }
+    assert "fields" not in result["gps"]
+    assert result["status"] == "PRESENT"
+
+
 def test_rejects_unsupported_and_malformed_files(tmp_path: Path) -> None:
     path = tmp_path / "archive.zip"
     path.write_bytes(b"PK\x03\x04")
@@ -165,13 +187,27 @@ def test_c2pa_parsed_manifest_without_errors_is_not_claimed_verified(tmp_path: P
                     "signature_info": {"issuer": "Example", "time": "2025-01-01T00:00:00Z"},
                 }
             },
+            "validation_status": {
+                "activeManifest": {
+                    "success": [
+                        {"code": "claimSignature.validated"},
+                        {"code": "signingCredential.trusted"},
+                        {"code": "assertion.dataHash.match"},
+                    ],
+                    "informational": [{"code": "timeStamp.validated"}],
+                }
+            },
         }
     )
     with patch("c2pa_analyzer.importlib.import_module", return_value=module):
         result = analyze_c2pa(path)
-    assert result["status"] == "INCONCLUSIVE"
+    assert result["status"] == "PRESENT"
     assert result["signature_issuer"] == "Example"
-    assert result["signature_integrity"] != "VERIFIED"
+    assert result["signature_integrity"] == "VERIFIED"
+    assert result["certificate_trust"] == "VERIFIED"
+    assert len(result["validation_successes"]) == 3
+    assert len(result["validation_informational"]) == 1
+    assert result["validation_issues"] == []
     assert result["remote_retrieval"] == "DISABLED"
 
 
@@ -181,14 +217,20 @@ def test_c2pa_validation_issues_are_reported_invalid(tmp_path: Path) -> None:
     module = _fake_c2pa_module(
         {
             "active_manifest": "claim",
-            "validation_status": [{"code": "claim.signature.mismatch"}],
+            "validation_status": {
+                "activeManifest": {
+                    "success": [{"code": "claimSignature.validated"}],
+                    "failure": [{"code": "assertion.dataHash.mismatch"}],
+                }
+            },
             "manifests": {"claim": {"assertions": []}},
         }
     )
     with patch("c2pa_analyzer.importlib.import_module", return_value=module):
         result = analyze_c2pa(path)
     assert result["status"] == "INVALID"
-    assert result["validation_issues"][0]["code"] == "claim.signature.mismatch"
+    assert result["signature_integrity"] == "VERIFIED"
+    assert result["validation_issues"][0]["code"] == "assertion.dataHash.mismatch"
 
 
 def test_c2pa_malformed_manifest_json_is_inconclusive(tmp_path: Path) -> None:
@@ -243,6 +285,60 @@ def test_report_splits_at_telegram_limit() -> None:
     assert len(chunks) > 1
     assert all(len(chunk) <= TELEGRAM_SAFE_MESSAGE_LENGTH for chunk in chunks)
     assert "ASSESSMENT" in chunks[-1]
+
+
+def test_report_formats_gps_software_actions_and_validation_compactly() -> None:
+    report = {
+        "file": {
+            "filename": "face.jpg",
+            "format": "JPEG",
+            "dimensions": [1280, 720],
+            "size_bytes": 1000,
+            "sha256": "abc",
+        },
+        "metadata": {
+            "software": [{"source": "EXIF Software", "value": "Windows 10", "kind": "declared"}],
+            "timestamps": [],
+            "gps": {
+                "status": "PRESENT",
+                "coordinates": {"latitude": 12.5, "longitude": -98.75},
+            },
+            "status": "PRESENT",
+        },
+        "c2pa": {
+            "status": "PRESENT",
+            "active_manifest": "claim",
+            "signature_integrity": "VERIFIED",
+            "certificate_trust": "NOT VERIFIED",
+            "assertions": [
+                {
+                    "label": "c2pa.actions.v2",
+                    "data": {
+                        "actions": [
+                            {
+                                "action": "c2pa.created",
+                                "softwareAgent": {"name": "ChatGPT", "version": "image-v1"},
+                                "digitalSourceType": "trainedAlgorithmicMedia",
+                            }
+                        ]
+                    },
+                }
+            ],
+            "validation_successes": [{"code": f"check.{index}.validated"} for index in range(30)],
+            "validation_issues": [],
+            "validation_informational": [],
+        },
+        "analysis_timestamp": "2025-01-01T00:00:00+00:00",
+        "application": {"version": "1.0"},
+    }
+    text = "\n".join(build_report(report))
+    assert "Dimensions: 1280 x 720" in text
+    assert "GPS: 12.5, -98.75" in text
+    assert "EXIF Software: Windows 10" in text
+    assert "c2pa.created (ChatGPT image-v1)" in text
+    assert "30 successful" in text
+    assert "check.0.validated" not in text
+    assert "8354" not in text
 
 
 def test_end_to_end_analysis_hash_and_report(tmp_path: Path) -> None:
