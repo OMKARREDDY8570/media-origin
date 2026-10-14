@@ -6,25 +6,41 @@ OriginTrace uses Telegram long polling and does not need a web server or databas
 
 1. Create a PythonAnywhere account and open a Bash console.
 2. Check the interpreters shown by PythonAnywhere and choose a supported Python 3.10+ version (prefer 3.11/3.12 where available and compatible native wheels exist).
-3. Clone or upload this project to a private directory. Keep `.env` out of source control.
+3. Open a Bash console and clone the repository into your home directory:
+
+   ```bash
+   cd ~
+   git clone https://github.com/OMKARREDDY8570/media-origin.git origintrace
+   cd ~/origintrace
+   ```
+
+   If the repository is private, use PythonAnywhere's supported GitHub authentication method. Do not put a GitHub personal access token into the clone URL or shell history. Keep local environment files out of source control.
 4. Create a virtual environment using the host's selected interpreter:
 
    ```bash
-   cd ~/origintrace
    python3.12 -m venv .venv
    source .venv/bin/activate
    python -m pip install --upgrade pip
-   python -m pip install -r requirements.txt
+   python -m pip install -r requirements-dev.txt
    ```
 
    Replace `python3.12` with an interpreter actually offered by the account.
 
-5. In the PythonAnywhere dashboard, use its environment-variable feature if available; otherwise store `.env` in the private project directory with owner-only permissions and never commit it. Set `TELEGRAM_BOT_TOKEN` to the BotFather token.
+5. Configure the rotated BotFather token without committing it. In the project directory, copy `.env.example` to `.env.local`, edit that file in the Bash console, and restrict its permissions:
+
+   ```bash
+   cp .env.example .env.local
+   nano .env.local
+   chmod 600 .env.local
+   ```
+
+   Set `TELEGRAM_BOT_TOKEN` to the replacement token. The application loads `.env.local` first, then `.env`, and finally the process environment if the value is not already set. Never paste the token into a command, deployment log, GitHub file, or support request.
 6. Check outbound access to Telegram using the account's supported network policy. Free accounts may have restricted outbound hosts; an account may need an eligible plan or a permitted Telegram API endpoint. Do not attempt to bypass the account's network restrictions.
 7. Check SDK capabilities:
 
    ```bash
    .venv/bin/python -c 'import telegram; print(telegram.__version__)'
+   .venv/bin/python -c 'from config import Config; print("Token configured:", bool(Config.from_environment().telegram_bot_token))'
    .venv/bin/python -c 'import c2pa; print("C2PA import OK")'
    ```
 
@@ -43,14 +59,21 @@ If the account has no always-on process support, a scheduled task can only run t
 
 ## 3. Verify and diagnose
 
-Run a local import test and automated tests in the virtualenv before enabling polling:
+Run the automated tests before enabling polling:
 
 ```bash
 .venv/bin/python -m pytest -q
-.venv/bin/python -c 'from config import Config; print("application modules import")'
+.venv/bin/python -m compileall -q .
 ```
 
-Start the task, message `/start`, then submit a small JPEG as a document. Check the task log for startup, outbound connection, or dependency errors. The bot logs exception classes and stage status but intentionally avoids logging image data, metadata, tokens, and Telegram user IDs.
+For an initial smoke test, run `.venv/bin/python main.py` directly in the Bash console, message `/start`, then submit a small JPEG as a document. Press Ctrl+C to stop that foreground test before enabling the persistent task. Do not leave both a foreground test and the always-on task polling the same token.
+
+When available on your account, create an **Always-on task** with:
+
+- Command: `/home/<your-username>/origintrace/.venv/bin/python /home/<your-username>/origintrace/main.py`
+- Working directory: `/home/<your-username>/origintrace`
+
+Start the task and check its task log for startup, outbound connection, or dependency errors. The bot logs exception classes and stage status but intentionally avoids logging image data, metadata, tokens, and Telegram user IDs. Do not configure this project as a PythonAnywhere web app or WSGI application; it is a long-polling process.
 
 ## Limitations and troubleshooting
 
