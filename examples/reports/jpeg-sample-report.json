@@ -1,0 +1,61 @@
+{
+  "analysis_id": "effd3709-5f93-49f5-8e02-7e944c04bdde",
+  "analysis_timestamp": "2026-10-14T19:44:21.804165+00:00",
+  "application": {
+    "name": "OriginTrace",
+    "version": "1.0.0"
+  },
+  "c2pa": {
+    "credential": "NOT DETECTED",
+    "reason": "The C2PA SDK did not find an embedded manifest.",
+    "remote_retrieval": "DISABLED",
+    "status": "NOT DETECTED"
+  },
+  "errors": [],
+  "file": {
+    "color_mode": "RGB",
+    "dimensions": [
+      12,
+      10
+    ],
+    "filename": "fixture.jpeg",
+    "format": "JPEG",
+    "frame_count": 1,
+    "sha256": "8b507bf47a2dcc7359841a455620594ad36158531f8d210cc8c7f45539e2d849",
+    "size_bytes": 632
+  },
+  "limitations": [
+    "Image authenticity and AI generation cannot be determined by this version.",
+    "Metadata can be missing, changed, or incomplete and is not independently authenticated.",
+    "C2PA support depends on the installed SDK's native library and supported formats."
+  ],
+  "metadata": {
+    "analyzed_at": "2026-10-14T19:44:21.718046+00:00",
+    "color_mode": "RGB",
+    "dimensions": [
+      12,
+      10
+    ],
+    "embedded_thumbnail": "NOT DETECTED",
+    "exif": {},
+    "gps": {
+      "status": "NOT DETECTED"
+    },
+    "iptc": {},
+    "software": [],
+    "status": "NOT DETECTED",
+    "timestamps": [],
+    "warnings": [
+      "ExifTool is not installed; IPTC extraction may be incomplete."
+    ],
+    "xmp": {}
+  },
+  "observations": [
+    {
+      "evidence_source": "Pillow metadata inspection",
+      "finding": "No common EXIF or XMP metadata was detected.",
+      "interpretation": "The file did not expose those metadata fields to this inspection.",
+      "limitation": "Metadata can be absent for many benign reasons; this does not prove editing."
+    }
+  ]
+}

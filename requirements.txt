@@ -1,0 +1,4 @@
+python-telegram-bot==22.8
+Pillow==12.2.0
+c2pa-python==0.38.0
+python-dotenv==1.0.1

@@ -1,0 +1,69 @@
+{
+  "analysis_id": "f8b711ac-0acc-48db-84db-efa718d38fff",
+  "analysis_timestamp": "2026-10-14T19:44:21.971068+00:00",
+  "application": {
+    "name": "OriginTrace",
+    "version": "1.0.0"
+  },
+  "c2pa": {
+    "credential": "NOT DETECTED",
+    "reason": "The C2PA SDK did not find an embedded manifest.",
+    "remote_retrieval": "DISABLED",
+    "status": "NOT DETECTED"
+  },
+  "errors": [],
+  "file": {
+    "color_mode": "RGB",
+    "dimensions": [
+      12,
+      10
+    ],
+    "filename": "fixture.tiff",
+    "format": "TIFF",
+    "frame_count": 1,
+    "sha256": "5575b46c764a0e4ce559cb5717141f6d0267210b672558c37455c31cf2e46812",
+    "size_bytes": 500
+  },
+  "limitations": [
+    "Image authenticity and AI generation cannot be determined by this version.",
+    "Metadata can be missing, changed, or incomplete and is not independently authenticated.",
+    "C2PA support depends on the installed SDK's native library and supported formats."
+  ],
+  "metadata": {
+    "analyzed_at": "2026-10-14T19:44:21.969613+00:00",
+    "color_mode": "RGB",
+    "dimensions": [
+      12,
+      10
+    ],
+    "embedded_thumbnail": "NOT DETECTED",
+    "exif": {
+      "BitsPerSample": [
+        8,
+        8,
+        8
+      ],
+      "Compression": 1,
+      "ImageLength": 10,
+      "ImageWidth": 12,
+      "PhotometricInterpretation": 2,
+      "PlanarConfiguration": 1,
+      "RowsPerStrip": 10,
+      "SamplesPerPixel": 3,
+      "StripByteCounts": 360,
+      "StripOffsets": 140
+    },
+    "gps": {
+      "status": "NOT DETECTED"
+    },
+    "iptc": {},
+    "software": [],
+    "status": "PRESENT",
+    "timestamps": [],
+    "warnings": [
+      "ExifTool is not installed; IPTC extraction may be incomplete."
+    ],
+    "xmp": {}
+  },
+  "observations": []
+}
